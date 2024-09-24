@@ -8,6 +8,8 @@ from importlib import import_module
 from os import path
 from subprocess import check_call, CalledProcessError
 
+connected = False
+
 def main():
     device_name = "thrustmaster_enzo"
     _context = usb1.USBContext()
@@ -29,10 +31,16 @@ def main():
         if path.exists(dev_path):
             _jscal(device.jscal, dev_path)
 
-    # Replace '/dev/ttyACM0' with the appropriate port for your Bluetooth module
-    bluetooth_port = '/dev/rfcomm0'  # Example port, replace with your Bluetooth module port
-    bluetooth_baudrate = 9600
-    ser = serial.Serial(bluetooth_port, bluetooth_baudrate)
+    try:
+        # Replace '/dev/ttyACM0' with the appropriate port for your Bluetooth module
+        bluetooth_port = '/dev/rfcomm0'  # Example port, replace with your Bluetooth module port
+        bluetooth_baudrate = 9600
+        ser = serial.Serial(bluetooth_port, bluetooth_baudrate)
+        connected = True
+    except serial.SerialException:
+        ser = None
+        print("Not connected to anyone in bluetooth")
+        
 
     thread = threading.Thread(target=read_gamepad, args=(ser,), daemon=True)
     thread.start()
@@ -62,7 +70,7 @@ def read_gamepad(ser):
     while True:
         events = get_gamepad()
         for event in events:
-            data = f"{event.code} {event.state}\n"
+            data = f"{event.code} {event.state} \n"
             if((oldCode == event.code and oldState == event.state) or event.code == "MSC_SCAN" or event.code == "SYN_REPORT"):
                 continue
             if(event.code == "ABS_X"):
@@ -70,11 +78,11 @@ def read_gamepad(ser):
                     continue
                 lastAbsX = event.state
 
-            print(f"{oldState}\t{lastAbsX}\t{data}")
+            print(data)
             oldState = event.state
             oldCode = event.code
-            
-            ser.write(data.encode())
+            if connected:
+                ser.write(data.encode())
 
 if __name__ == '__main__':
     main()
